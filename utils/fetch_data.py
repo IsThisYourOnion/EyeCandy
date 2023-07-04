@@ -1,15 +1,13 @@
 import os
-import os.path
 import json
 from PIL import Image
 import requests
 from io import BytesIO
-import sys
 import zipfile
 import gdown
 import subprocess
-import sys
 from config import config
+import sys
 
 
 class FetchData:
@@ -17,15 +15,19 @@ class FetchData:
         self.paths = paths
         self.urls = urls
 
+    def _is_extracted(self, path):
+        return os.path.exists(path)
+
     def download_and_unzip(self, url, extract_to='.'):
         zip_file_path = url.split('/')[-1]
+        if self._is_extracted(extract_to):
+            print(f"Data from {url} already exists in {extract_to}, skipping download.")
+            return
         response = requests.get(url)
         with open(zip_file_path, 'wb') as file:
             file.write(response.content)
-
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(extract_to)
-
         os.remove(zip_file_path)
 
     def download_datasets(self):
@@ -35,78 +37,56 @@ class FetchData:
     def process_dataset(self, dataset_path):
         dataset_dir = os.path.dirname(dataset_path)
         print(f"Processing dataset: {dataset_path}")
-
-        # Load annotations
+        if not os.path.exists(dataset_path):
+            print(f"Dataset {dataset_path} doesn't exist.")
+            return
         with open(dataset_path, 'r') as f:
-            annotations = json.loads(f.read())
-            nr_images = len(annotations['images'])
-            for i in range(nr_images):
-                image = annotations['images'][i]
-
+            annotations = json.load(f)
+            for i, image in enumerate(annotations['images']):
                 file_name = image['file_name']
                 url_original = image['flickr_url']
-
                 file_path = os.path.join(dataset_dir, file_name)
-
-                # Create subdir if necessary
-                subdir = os.path.dirname(file_path)
-                if not os.path.isdir(subdir):
-                    os.mkdir(subdir)
-
+                os.makedirs(os.path.dirname(file_path), exist_ok=True)
                 if not os.path.isfile(file_path):
-                    # Load and Save Image
                     response = requests.get(url_original)
                     img = Image.open(BytesIO(response.content))
-                    if img._getexif():
-                        img.save(file_path, exif=img.info["exif"])
-                    else:
-                        img.save(file_path)
+                    img.save(file_path, exif=img.info["exif"] if img._getexif() else None)
+                self._progress_bar(i, len(annotations['images']))
+            print('Finished')
 
-                # Show loading bar
-                bar_size = 30
-                x = int(bar_size * i / nr_images)
-                sys.stdout.write("%s[%s%s] - %i/%i\r" % ('Loading: ', "=" * x, "." * (bar_size - x), i, nr_images))
-                sys.stdout.flush()
-                i+=1
+    def _progress_bar(self, i, total, bar_size=30):
+        x = int(bar_size * i / total)
+        sys.stdout.write("%s[%s%s] - %i/%i\r" % ('Loading: ', "=" * x, "." * (bar_size - x), i, total))
+        sys.stdout.flush()
 
-            sys.stdout.write('Finished\n')
-
-    # annotations data downloads save progress. so if something happens just re-run and it will pick up where it left off.
     def process_datasets(self):
         for path in self.paths:
             self.process_dataset(path)
 
     def download_from_drive(self, url, output, extract_to):
+        if self._is_extracted(extract_to):
+            print(f"Data from {url} already exists in {extract_to}, skipping download.")
+            return
         gdown.download(url, output, quiet=False)
-        with zipfile.ZipFile(output, 'r') as zip_ref:
-            zip_ref.extractall(extract_to)
-        os.remove(output)
+        self.download_and_unzip(output, extract_to)
 
     def download_from_kaggle(self, dataset, extract_to='./data/kaggle_waste/'):
+        if self._is_extracted(extract_to):
+            print(f"Data from {dataset} already exists in {extract_to}, skipping download.")
+            return
         subprocess.run(['kaggle', 'datasets', 'download', '-d', dataset])
-        zip_file_path = dataset.split('/')[-1] + '.zip'
-        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
-            zip_ref.extractall(extract_to)
-        os.remove(zip_file_path)
-
+        self.download_and_unzip(dataset + '.zip', extract_to)
 
 
 def pullDatasets():
-    # Define  dataset paths and download urls.
     taco_paths = config.taco_paths
     umn_urls = config.umn_urls
-    # Create an instance of FetchData
     processor = FetchData(taco_paths, umn_urls)
-    # Download the datasets
     processor.download_datasets()
-    # Process the datasets
     processor.process_datasets()
-    # Download from Google Drive
     google_url = config.google_url
     google_output = config.google_output
     processor.download_from_drive(google_url, google_output, "./data/mju")
-    # Download from Kaggle
     kaggle_dataset = config.kaggle_datasets
     for kaggle_data in kaggle_dataset:
         processor.download_from_kaggle(kaggle_data)
-

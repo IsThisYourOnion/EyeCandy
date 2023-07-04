@@ -1,6 +1,6 @@
 
 # TACO Annotation Paths
-taco_paths = ['./data/taco/annotations_unofficial.json', './data/uav/annotations.json']
+taco_paths = ['./data/taco/annotations.json', './data/uav/annotations.json']
 
 # UMN Urls
 
