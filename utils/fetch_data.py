@@ -1,16 +1,35 @@
 import os
 import os.path
-import argparse
 import json
 from PIL import Image
 import requests
 from io import BytesIO
 import sys
 import zipfile
+import gdown
+import subprocess
+from config import config
+
 
 class FetchData:
-    def __init__(self, paths):
+    def __init__(self, paths, urls):
         self.paths = paths
+        self.urls = urls
+
+    def download_and_unzip(self, url, extract_to='.'):
+        zip_file_path = url.split('/')[-1]
+        response = requests.get(url)
+        with open(zip_file_path, 'wb') as file:
+            file.write(response.content)
+
+        with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
+            zip_ref.extractall(extract_to)
+
+        os.remove(zip_file_path)
+
+    def download_datasets(self):
+        for url in self.urls:
+            self.download_and_unzip(url, extract_to='./data/UMN/')
 
     def process_dataset(self, dataset_path):
         dataset_dir = os.path.dirname(dataset_path)
@@ -19,7 +38,6 @@ class FetchData:
         # Load annotations
         with open(dataset_path, 'r') as f:
             annotations = json.loads(f.read())
-
             nr_images = len(annotations['images'])
             for i in range(nr_images):
                 image = annotations['images'][i]
@@ -57,29 +75,41 @@ class FetchData:
         for path in self.paths:
             self.process_dataset(path)
 
-def download_and_unzip(urls, extract_to='.'):
-    for url in urls:
-        zip_file_path = url.split('/')[-1]  # Use the last part of the URL as a temporary filename
-        response = requests.get(url)
-        with open(zip_file_path, 'wb') as file:
-            file.write(response.content)
+    def download_from_drive(self, url, output, extract_to):
+        gdown.download(url, output, quiet=False)
+        with zipfile.ZipFile(output, 'r') as zip_ref:
+            zip_ref.extractall(extract_to)
+        os.remove(output)
 
+    def download_from_kaggle(self, dataset, extract_to='./data/kaggle_waste/'):
+        subprocess.run(['kaggle', 'datasets', 'download', '-d', dataset])
+        zip_file_path = dataset.split('/')[-1] + '.zip'
         with zipfile.ZipFile(zip_file_path, 'r') as zip_ref:
             zip_ref.extractall(extract_to)
-
-        # Remove the zip file as it's no longer needed
         os.remove(zip_file_path)
 
-# Download and unzip the datasets
-urls = ["https://conservancy.umn.edu/bitstream/handle/11299/214366/trash_ICRA19.zip?sequence=12&isAllowed=y",
-        "https://conservancy.umn.edu/bitstream/handle/11299/214865/dataset.zip?sequence=12&isAllowed=y"]
-download_and_unzip(urls, extract_to='./data/UMN/')
 
-# Define your dataset paths. You might need to adjust this according to the structure of the unzipped datasets.
-paths = ['./data/taco/taco_annotations.json', './data/uav/uav_annotations.json']
 
-# Create an instance of DatasetProcessor
-processor = FetchData(paths)
+def pullPatasets():
+    # Define your dataset paths and download urls.
+    taco_paths = config.taco_paths
+    umn_urls = config.umn_urls
+    # Create an instance of FetchData
+    processor = FetchData(taco_paths, umn_urls)
+    # Download the datasets
+    processor.download_datasets()
 
-# Call process_datasets to start processing
-processor.process_datasets()
+    # Process the datasets
+    processor.process_datasets()
+
+    # Download from Google Drive
+    google_url = config.google_url
+    google_output = config.google_output
+    processor.download_from_drive(google_url, google_output, "./data/mju")
+
+    # Download from Kaggle
+    kaggle_dataset = config.kaggle_datasets
+    for kaggle_data in kaggle_dataset:
+        processor.download_from_kaggle(kaggle_data)
+
+pullPatasets()
