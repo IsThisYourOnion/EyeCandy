@@ -70,8 +70,8 @@ class FetchData:
 
             sys.stdout.write('Finished\n')
 
+    # annotations data downloads save progress. so if something happens just re-run and it will pick up where it left off.
     def process_datasets(self):
-        print('Note. If for any reason the connection is broken. Just call me again and I will start where I left.')
         for path in self.paths:
             self.process_dataset(path)
 
