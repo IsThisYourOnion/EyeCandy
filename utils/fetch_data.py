@@ -9,7 +9,7 @@ import zipfile
 import gdown
 import subprocess
 import sys
-from ..config import config
+from config import config
 
 
 class FetchData:
