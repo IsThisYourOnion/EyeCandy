@@ -8,7 +8,8 @@ import sys
 import zipfile
 import gdown
 import subprocess
-from config import config
+import sys
+from ..config import config
 
 
 class FetchData:
@@ -90,7 +91,7 @@ class FetchData:
 
 
 
-def pullPatasets():
+def pullDatasets():
     # Define  dataset paths and download urls.
     taco_paths = config.taco_paths
     umn_urls = config.umn_urls
@@ -109,4 +110,3 @@ def pullPatasets():
     for kaggle_data in kaggle_dataset:
         processor.download_from_kaggle(kaggle_data)
 
-pullPatasets()
