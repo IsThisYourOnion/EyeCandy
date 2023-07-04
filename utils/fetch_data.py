@@ -91,22 +91,19 @@ class FetchData:
 
 
 def pullPatasets():
-    # Define your dataset paths and download urls.
+    # Define  dataset paths and download urls.
     taco_paths = config.taco_paths
     umn_urls = config.umn_urls
     # Create an instance of FetchData
     processor = FetchData(taco_paths, umn_urls)
     # Download the datasets
     processor.download_datasets()
-
     # Process the datasets
     processor.process_datasets()
-
     # Download from Google Drive
     google_url = config.google_url
     google_output = config.google_output
     processor.download_from_drive(google_url, google_output, "./data/mju")
-
     # Download from Kaggle
     kaggle_dataset = config.kaggle_datasets
     for kaggle_data in kaggle_dataset:
